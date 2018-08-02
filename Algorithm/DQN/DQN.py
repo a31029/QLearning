@@ -16,7 +16,6 @@ class DQN():
         self.do_train = do_train
         self.do_save = do_save
 
-        self.gamma_reward = 0.92
         self.gamma_value = 0.9
 
         self.train_count = 0
@@ -62,22 +61,23 @@ class DQN():
         self.loss = tf.reduce_mean(tf.square(tf.reduce_sum(tf.multiply(self.Q_eval, tf.one_hot(self.act, 2)), reduction_indices=1) - self.target))
         
         self.current_step = tf.Variable(0, trainable=False)
-        self.learning_rate = tf.train.exponential_decay(self.lr,global_step = self.current_step,decay_steps=5000,decay_rate=0.95,staircase=True)
+        self.learning_rate = tf.train.exponential_decay(self.lr,global_step = self.current_step,decay_steps=8000,decay_rate=0.95,staircase=True)
         self.step = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,global_step = self.current_step)
 
         self.saver = tf.train.Saver()
         if len([str(x) for x in Path('Algorithm/DQN/Net').iterdir() if x.match('model.ckpt*')]) != 0 and self.do_load:
             self.saver.restore(self.sess, "Algorithm/DQN/Net/model.ckpt")
+            print('load net parameters!!!')
         else:
             self.sess.run(tf.global_variables_initializer())
-
+            print('init net parameters!!!')
         self._update()
 
     def _build_memory(self):
         self.prev = None
         self.memory_batch = []
 
-        self.memory = deque(self.loadFile('Algorithm/DQN/Memory/memory'),maxlen=10000)
+        self.memory = deque(self.loadFile('Algorithm/DQN/Memory/memory'),maxlen=5000)
         # self.memory_pos = deque(self.loadFile('Algorithm/DQN/Memory/memory_pos'), maxlen=10000)
         # self.memory_neg = deque(self.loadFile('Algorithm/DQN/Memory/memory_neg'), maxlen=10000)
 
@@ -91,88 +91,70 @@ class DQN():
 
     def _get_action(self,state):
         if np.random.uniform(0, 1) <= self.explore:
-            # print("explore!!!")
-            action = np.random.choice([0,0,0,0,0,0,0,0,0,1])
+            action = np.random.choice([0,0,0,0,0,0,0,0,0,0,0,0,0,1])
         else:
             actions = self.sess.run(self.Q_eval, feed_dict={self.input1: np.array([state])})
-            # print(actions)
             action = np.argmax(actions)
         return action
 
-
-
-    def run(self,now,dead,action):
-
-        state = now
-
-        action = self._get_action(state)
-
-        if dead >= 0 :
-            reward = 1
-        else:
-            reward = dead
-
+    def _remember_step(self,state,action,reward):
         if self.prev  is None:
             self.prev = np.hstack((state,action))
         else:
             self.memory_batch.append(np.hstack((self.prev, reward, state)))
             self.prev = np.hstack((state,action))
 
+    def _remember_batch(self):
+        self.memory.extend(self.memory_batch)
+        self.memory_batch = []
+        self.prev = None
+
+    def run(self,now,dead,action):
+
+        state = np.array(now)[1:]
+        action = self._get_action(state)
+        if dead >= 0 :
+            reward = 1
+        else:
+            reward = dead
+        
+        self._remember_step(state,action,reward)
+
         if dead <  0:
+            self._remember_batch()
             self.train_count += 1
-            self.prev = None
 
-            tmp = np.array(self.memory_batch)
-            tmp[:,self.state_dim+1] = self._discount_and_norm_rewards(tmp[:,self.state_dim+1])
-            self.memory.extend(tmp.tolist())
-
-            if self.train_count % 20 == 0  and self.do_train:
+            if self.train_count % 2 == 0 and len(self.memory) > 2000:
                 self.train()
                 self.saveFile('Algorithm/DQN/Memory/memory',self.memory)
                 self.saveNet()
                 self.explore = self.explore * 0.3
                 if self.explore <= 0.001:
                     self.explore = 0
-            if self.train_count % 400 == 0 and self.do_train:
+            if self.train_count % 10 == 0 and len(self.memory) > 2000:
                 self._update()
         return action
 
-
-
     def train(self):
-        for i in range(int(500 * self.explore)+120):
+        if self.do_train:
+            for i in range(100):
+                length = min(len(self.memory),32)
+                data_all = np.array(self.memory)
+                data = data_all[np.random.choice(data_all.shape[0],length,replace=False)]
 
-            length = min(len(self.memory),24)
-            data_all = np.array(self.memory)
-            data = data_all[np.random.choice(data_all.shape[0],length,replace=False)]
-    
-            q_ = self.sess.run(self.Q_target, feed_dict={self.input2: data[:,-1*self.state_dim:]})
-            act = data[:,self.state_dim].astype(int)
-            indR_neg = (data[:, self.state_dim + 1] < 0).astype(int)
-            target = data[:,self.state_dim + 1] + (1 - indR_neg) * self.gamma_value *np.max(q_, axis=1)
+                q_ = self.sess.run(self.Q_target, feed_dict={self.input2: data[:,-1*self.state_dim:]})
+                target = data[:,self.state_dim + 1] + (data[:,self.state_dim + 1] > 0) * self.gamma_value * np.max(q_, axis=1)
+                act = data[:,self.state_dim].astype(int)
+                _, loss_value, lr = self.sess.run([self.step, self.loss, self.learning_rate], feed_dict={self.input1: data[:, 0:self.state_dim], self.act: act, self.target: target})
 
-            _, loss_value, lr = self.sess.run([self.step, self.loss, self.learning_rate], feed_dict={self.input1: data[:, 0:self.state_dim], self.act: act, self.target: target})
-
-            # self.llist.append(loss_value)
-        print('>>>>>>>>>>>>>>>>> lr: %s <<<<<<<<<<<<<<<<<<<<<<<'%lr)
-        print(self.explore,loss_value)
-
-    def _discount_and_norm_rewards(self,v):
-        discounted_ep_rs = np.zeros_like(v).astype(float)
-        running_add = 0
-        for t in reversed(range(0, discounted_ep_rs.shape[0])):
-            running_add = running_add * self.gamma_reward + v[t]
-            discounted_ep_rs[t] = running_add
-        # normalize episode rewards
-        # discounted_ep_rs -= np.mean(discounted_ep_rs)
-        # discounted_ep_rs /= np.std(discounted_ep_rs)
-        # print(discounted_ep_rs)
-        return discounted_ep_rs
+                # self.llist.append(loss_value)
+            print('\t\tlearning rate: %s ;    loss: %s;    explore:%s.'%(lr,loss_value,self.explore))
 
 
     def saveNet(self):
         if self.do_save:
             self.saver.save(self.sess, "Algorithm/DQN/Net/model.ckpt")
+            print('Net has been saved successfully')
 
     def saveFile(self,fileName,obj):
         if self.do_save:

@@ -11,7 +11,7 @@ class Parameters():
 
 
     music_volume= 0.2
-    mix_volume = 0.1
+    mix_volume = 0
 
     bird_height = 24
     bird_width = 34

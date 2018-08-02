@@ -148,7 +148,7 @@ class Pipe(mySprite):
             self.graph = None
         else:
             if graph_file is None or graph_container is None :
-                print("alert:需要一个Q值图和图的容器!!!!!")
+                # print("alert:需要一个Q值图和图的容器!!!!!")
                 self.graph = None
                 self.container = None
             else:
@@ -208,7 +208,7 @@ class ScoreBord():
 
 # 构建游戏
 class FlappyBird():
-    def __init__(self, is_speed_in_state = False):
+    def __init__(self, is_speed_in_state = False,vec = True,graph = False):
         pygame.init()
         pygame.freetype.init()
         pygame.display.set_caption(Parameters.sys_caption)
@@ -217,6 +217,8 @@ class FlappyBird():
         self.play_index = 0
         self.musicFlag = True
         self.is_speed_in_state = is_speed_in_state
+        self.vec = vec
+        self.graph = graph
 
         # 先建管子 再建图 
         # 更新的时候 先更新图，在更新管子，如果管子重置，图也跟着重置
@@ -226,7 +228,8 @@ class FlappyBird():
         self._bg = pygame.image.load(np.random.choice(File_Path.bg))
 
         self._groud_group = pygame.sprite.LayeredUpdates()
-        self._graph_group = pygame.sprite.LayeredUpdates()
+        if self.graph:
+            self._graph_group = pygame.sprite.LayeredUpdates()
         self._flappy = pygame.sprite.Group()
 
         self._ground1 = Ground(File_Path.ground, Parameters.ground_row_col, Parameters.ground1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,Parameters.ground_num)
@@ -237,11 +240,20 @@ class FlappyBird():
         pipeFile = np.random.choice(File_Path.pipe)
         Pipe.resetY()
         self._pipe1u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
-        self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+        if self.graph:
+            self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+        else:
+            self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
         self._pipe2u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
-        self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+        if self.graph:
+            self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+        else:
+            self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
         self._pipe3u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
-        self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+        if self.graph:
+            self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+        else:
+            self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
         
         self._groud_group.add(self._ground1, layer=1)
         self._groud_group.add(self._ground2, layer=1)
@@ -251,10 +263,11 @@ class FlappyBird():
         self._groud_group.add(self._pipe2d,layer=0)
         self._groud_group.add(self._pipe3u,layer=0)
         self._groud_group.add(self._pipe3d,layer=0)
-
-        self._graph_group.add(self._pipe1d.graph,layer = 3)
-        self._graph_group.add(self._pipe2d.graph,layer = 2)
-        self._graph_group.add(self._pipe3d.graph,layer = 1)
+        
+        if self.graph:
+            self._graph_group.add(self._pipe1d.graph,layer = 3)
+            self._graph_group.add(self._pipe2d.graph,layer = 2)
+            self._graph_group.add(self._pipe3d.graph,layer = 1)
 
         self._bird = Bird(np.random.choice(File_Path.bird), Parameters.bird_row_col,Parameters.bird_location,
                           Parameters.bird_frame_speed, Parameters.bird_moving_speed, Parameters.bird_moving_acc)
@@ -335,12 +348,14 @@ class FlappyBird():
                 # 刷新图像
                 # 先更新图，再更新管子
                 # 画的时候，先画图 在画管子和小鸟
-                self._graph_group.update()
+                if self.graph:
+                    self._graph_group.update()
                 self._flappy.update()
                 self._groud_group.update()
                 self._score_bord.update()
                 self._screen.blit(self._bg, (0, 0))
-                self._graph_group.draw(self._screen)
+                if self.graph:
+                    self._graph_group.draw(self._screen)
                 self._flappy.draw(self._screen)
                 self._groud_group.draw(self._screen)
                 self._score_bord.draw(self._screen)
@@ -361,8 +376,11 @@ class FlappyBird():
                         jump = 1
 
                 #判断是否修改动作
-                if func is not None:
+                if func is not None and self.vec:
                     jump = func(self.now, self.dead, jump)
+
+                if func is not None and not self.vec:
+                    jump = func(self.getImage(),self.dead,jump)
 
                 self._bird.jump(Parameters.bird_actions[jump])
 
