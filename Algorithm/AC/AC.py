@@ -1,17 +1,21 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
-
 import collections
 import time
 import random
 import pickle
 from pathlib import Path
 
+from PIL import Image
+
 
 
 class AC:
-    def __init__(self,state_dim = 4,do_load = False,do_save = False,do_train = False):
+    def __init__(self,l1 = 1e-4,l2=1e-3,state_dim = 4,do_load = False,do_save = False,do_train = False):
+
+        self.learning_rate_critic = l1
+        self.learning_rate_actor = l2
 
         self.state_dim = state_dim
         self.do_load = do_load
@@ -19,13 +23,14 @@ class AC:
         self.do_train = do_train
 
         self.gamma_value = 0.9
-        self.gamma_reward = 0
 
         self.train_counter = 1
 
         self._get_session()
         self._build_net()
         self._build_memory()
+
+        self.max_value = 0
 
 
     def _get_session(self):
@@ -42,9 +47,9 @@ class AC:
         self.td_error = tf.placeholder(tf.float32, shape=[None,1])
 
         with tf.variable_scope('actor'):
-            self.l1_actor = tf.layers.dense(self.s_eval,32,activation=tf.nn.tanh)
-            self.l2_actor = tf.layers.dense(self.l1_actor,32,activation=tf.nn.tanh)
-            self.output_actor = tf.layers.dense(self.l2_actor,2,activation=tf.nn.softmax)
+            self.l1_actor = tf.layers.dense(self.s_eval,32,activation=tf.nn.tanh,kernel_initializer=tf.random_normal_initializer(0,0.1))
+            self.l2_actor = tf.layers.dense(self.l1_actor,16,activation=tf.nn.tanh,kernel_initializer=tf.random_normal_initializer(0,0.1))
+            self.output_actor = tf.layers.dense(self.l2_actor,2,activation=tf.nn.softmax,kernel_initializer=tf.random_normal_initializer(0,0.1))
             
         with tf.variable_scope('critic_eval'):
 
@@ -80,12 +85,10 @@ class AC:
 
         with tf.variable_scope('loss'):
 
-            self.critic_loss = tf.reduce_sum(tf.square(self.output_critic_eval - (self.gamma_value * self.output_critic_target * tf.cast(tf.greater(self.r , 0),tf.float32) + self.r)))
+            self.critic_loss = tf.reduce_mean(tf.square(self.output_critic_eval - (self.gamma_value * self.output_critic_target * tf.cast(tf.greater(self.r , 0),tf.float32) + self.r)))
             self.log_prob = tf.log(self.output_actor)
-            self.actor_loss = tf.reduce_sum(tf.reduce_sum(tf.one_hot(self.a,2) * self.log_prob ,axis = 1) * self.td_error)
+            self.actor_loss = (tf.reduce_mean(tf.reduce_sum(tf.one_hot(self.a,2) * self.log_prob ,axis = 1) * self.td_error * -1))
 
-        self.learning_rate_critic = 1e-3
-        self.learning_rate_actor = 5e-5
 
         with tf.variable_scope('train'):
             self.op_critic = tf.train.AdamOptimizer(self.learning_rate_critic)
@@ -98,9 +101,9 @@ class AC:
 
         if len([str(x) for x in Path('Algorithm/AC/Net').iterdir() if x.match('model.ckpt*')]) != 0 and self.do_load:
             self.saver.restore(self.sess, "Algorithm/AC/Net/model.ckpt")
-            print('load net parameters!!!')
+            # print('load net parameters!!!')
         else:
-            print('init net parameters!!!')
+            # print('init net parameters!!!')
             self.sess.run(tf.global_variables_initializer())
         self._update()
 
@@ -108,7 +111,7 @@ class AC:
         self.prev = None
         self.memory_batch = []
 
-        self.memory = collections.deque(self.loadFile('Algorithm/AC/Memory/memory'), maxlen=5000)
+        self.memory = collections.deque(self.loadFile('Algorithm/AC/Memory/memory'), maxlen=2000)
 
 
     def _update(self):
@@ -118,14 +121,15 @@ class AC:
         self.sess.run(tf.assign(self.l2_b_critic_target, self.l2_b_critic_eval))
         self.sess.run(tf.assign(self.l3_w_critic_target, self.l3_w_critic_eval))
         self.sess.run(tf.assign(self.l3_b_critic_target, self.l3_b_critic_eval))
-        print('update target net parameters')
+        # print('update target net parameters')
 
     def _get_action(self, s):
-        if self.train_counter < 3:
-            return np.random.choice([0,0,0,0,0,0,0,1])
-        else:
-            output_actor = self.sess.run(self.output_actor, feed_dict={self.s_eval: np.array([s])})
-            return np.random.choice([0,1],p=output_actor[0])
+        # if self.train_counter < 400:
+        #     return np.random.choice([0,0,0,0,0,0,0,0,1])
+        #     # return 0
+        # else:
+        output_actor = self.sess.run(self.output_actor, feed_dict={self.s_eval: np.array([s])})
+        return np.random.choice([0,1],p=output_actor[0])
 
     def _remember_step(self,state,action,reward):
         if self.prev  is None:
@@ -137,36 +141,38 @@ class AC:
     def _remember_batch(self):
         self.tmp = np.array(self.memory_batch)
         # self.tmp[:,self.state_dim+1] = self._discount_and_norm_rewards(self.tmp[:,self.state_dim+1])
-        self.memory.extend(self.tmp.tolist())
+        self.memory.extend(self.memory_batch)
         self.memory_batch = []
         self.prev = None
 
     def run(self, now, dead, action):
 
-        state = np.array(now)[1:]
-        # state = now
+        state = np.array([now[0] - now[2] ,now[1] - now[3] ,now[3], now[4]])
         action = self._get_action(state)
         if dead >= 0 :
             reward = 1
         else:
             reward = dead
-        
         self._remember_step(state,action,reward)
+
+        if dead > self.max_value:
+            self.max_value = dead
 
         if dead < 0:
             self._remember_batch()
 
-            if len(self.memory) > 2000:
-                self.train_counter += 1
-                if self.train_counter % 3 == 0 or (self.train_counter <= 3):
+            if len(self.memory) > 300:
+                if self.train_counter % 10  == 0 or self.train_counter <= 20:
                     self.ctrain()
+                if self.train_counter > 20:
+                    self.atrain()
+                if self.train_counter % 20 == 0 :
+                    self._update()
                     self.saveFile('Algorithm/AC/Memory/memory', self.memory)
                     self.saveNet()
-                    
-                if self.train_counter > 3:
-                    self.atrain()
-                if (self.train_counter % 6 == 0 and self.train_counter > 3):
-                    self._update()
+                self.train_counter += 1
+                if self.train_counter % 200 == 0:
+                    print('小鸟训练了%s次，最大的数字为%s：'%(self.train_counter,self.max_value))
         return action
 
 
@@ -175,22 +181,21 @@ class AC:
             data = self.tmp
             s = data[:,:self.state_dim]
             a = data[:, self.state_dim]
+            r = data[:,self.state_dim+1:self.state_dim+2]
             s_ = data[:, self.state_dim+2:]
 
             old = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval: s})
             new = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval: s_})
-            v_error = (new - old)
+            v_error = new  + r - old
             _,a_loss,op = self.sess.run([self.train_actor,self.actor_loss,self.output_actor], feed_dict={self.a:a,self.s_eval:s,self.td_error: v_error})
             
-            new_tar = self.sess.run(self.output_critic_target,feed_dict={self.s_target:s_})
-
-            # print(np.hstack((op,v_error,a,old,new,new_tar))[[[-5,-4,-3,-2,-1]]])
-            # print(data[[-5,-4,-3,-2,-1]])
-            # print('a_loss: %.2f'%(a_loss))
+            # print(v_error[[-3,-2,-1]])
+            # print(data[[-3,-2,-1]])
+            print('a_loss: %.2f'%(a_loss))
     
     def ctrain(self):
         if self.do_train:
-            for i in range(100):
+            for i in range(120):
                 length = min(len(self.memory), 32)
                 data = np.array(self.memory)[np.random.choice(len(self.memory), length,replace=False)]
 
@@ -200,12 +205,13 @@ class AC:
 
                 _,c_loss = self.sess.run([self.train_critic,self.critic_loss], feed_dict={self.s_eval: s, self.s_target: s_, self.r: r})
             print('c_loss:%.2f'%(c_loss))
+            self.plot()
         
 
     def saveNet(self):
         if self.do_save:
             self.saver.save(self.sess, "Algorithm/AC/Net/model.ckpt")
-            print('net has been saved successfully')
+            # print('net has been saved successfully')
 
     def saveFile(self, fileName, obj):
         if self.do_save:
@@ -223,3 +229,27 @@ class AC:
             return {}
 
 
+
+    # def _discount_and_norm_rewards(self,v):
+    #     discounted_ep_rs = np.zeros_like(v).astype(float)
+    #     running_add = 0
+    #     for t in reversed(range(0, discounted_ep_rs.shape[0])):
+    #         running_add = running_add * self.gamma_value + v[t]
+    #         discounted_ep_rs[t] = running_add
+    #     # normalize episode rewards
+    #     # discounted_ep_rs -= np.mean(discounted_ep_rs)
+    #     # discounted_ep_rs /= np.std(discounted_ep_rs)
+    #     # print(discounted_ep_rs)
+    #     return discounted_ep_rs
+
+    def plot(self):
+
+        xx,yy = np.meshgrid(np.arange(600),np.arange(280))
+        x = xx.flatten() - 228
+        y = yy.flatten() - 380
+        yd = np.ones_like(x) * 360
+        sp = np.ones_like(y) * 4.5
+        arr = np.vstack((x,y,yd,sp)).transpose(1,0)
+        re = self.sess.run(self.output_actor,feed_dict={self.s_eval:arr})
+        img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
+        plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)

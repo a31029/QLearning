@@ -208,7 +208,7 @@ class ScoreBord():
 
 # 构建游戏
 class FlappyBird():
-    def __init__(self, is_speed_in_state = False,vec = True,graph = False):
+    def __init__(self, is_speed_in_state = False,vec = True,graph = False,interval = 4):
         pygame.init()
         pygame.freetype.init()
         pygame.display.set_caption(Parameters.sys_caption)
@@ -219,6 +219,7 @@ class FlappyBird():
         self.is_speed_in_state = is_speed_in_state
         self.vec = vec
         self.graph = graph
+        self.interval = interval
 
         # 先建管子 再建图 
         # 更新的时候 先更新图，在更新管子，如果管子重置，图也跟着重置
@@ -241,17 +242,17 @@ class FlappyBird():
         Pipe.resetY()
         self._pipe1u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
         if self.graph:
-            self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+            self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[0],Parameters.ground_row_col,self._graph_group)
         else:
             self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
         self._pipe2u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
         if self.graph:
-            self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+            self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[0],Parameters.ground_row_col,self._graph_group)
         else:
             self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
         self._pipe3u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
         if self.graph:
-            self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[-1],Parameters.ground_row_col,self._graph_group)
+            self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[0],Parameters.ground_row_col,self._graph_group)
         else:
             self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
         
@@ -337,7 +338,10 @@ class FlappyBird():
         while(True):
             self._build()
             clock = pygame.time.Clock()
+            c_ter = 0
             while True:
+
+                c_ter += 1
 
                 #设置时间
                 clock.tick(Parameters.sys_frame_rate)
@@ -376,10 +380,10 @@ class FlappyBird():
                         jump = 1
 
                 #判断是否修改动作
-                if func is not None and self.vec:
+                if func is not None and self.vec and (c_ter % self.interval == 0 or self.dead < 0):
                     jump = func(self.now, self.dead, jump)
 
-                if func is not None and not self.vec:
+                if func is not None and not self.vec and (c_ter % self.interval == 0 or self.dead <0):
                     jump = func(self.getImage(),self.dead,jump)
 
                 self._bird.jump(Parameters.bird_actions[jump])

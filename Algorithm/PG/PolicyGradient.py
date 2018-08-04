@@ -25,6 +25,7 @@ class PG:
         self._build_memory()
         self._build_memory_pool()
         self._build_net()
+        print('start Policy Gradient algorithm')
 
 
     def _get_session(self):
@@ -42,17 +43,17 @@ class PG:
     def _build_net(self):
         self.state = tf.placeholder(tf.float32,shape=[None,self.state_dim])
 
-        self.first_layer = tf.layers.dense(self.state,32,activation=tf.nn.tanh,use_bias=True,bias_initializer=tf.random_uniform_initializer(-3,3))
-        self.second_layer = tf.layers.dense(self.first_layer,16,activation=tf.nn.tanh,use_bias=True,bias_initializer=tf.random_uniform_initializer(-3,3))
+        self.first_layer = tf.layers.dense(self.state,32,activation=tf.nn.tanh)
+        self.second_layer = tf.layers.dense(self.first_layer,16,activation=tf.nn.tanh)
         self.prob = tf.layers.dense(self.second_layer,2,activation=tf.nn.softmax)
     
         self.action = tf.placeholder(tf.int32,shape=[None])
         self.value = tf.placeholder(tf.float32,shape=[None])
 
-        self.loss = tf.reduce_mean(tf.reduce_sum(tf.log(self.prob) * tf.one_hot(self.action, 2), axis=1) * self.value)
+        self.loss = tf.reduce_mean(tf.reduce_sum( tf.log( self.prob) * tf.one_hot(self.action, 2), axis=1) * self.value * -1)
 
         self.current_step = tf.Variable(0, trainable=False)
-        self.learning_rate = tf.train.exponential_decay(-1 * self.lr,global_step = self.current_step,decay_steps=1000,decay_rate=0.95,staircase=True)
+        self.learning_rate = tf.train.exponential_decay(self.lr,global_step = self.current_step,decay_steps=400,decay_rate=0.9,staircase=True)
         self.step = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss,global_step=self.current_step)
 
         self.saver = tf.train.Saver()
@@ -65,9 +66,9 @@ class PG:
 
     def _get_action(self,state):
         probs = self.sess.run(self.prob, feed_dict={self.state: np.array([state])})[0]
-        probs = np.array([probs[0]/probs.sum(),probs[1]/probs.sum()])
+        # print(probs)
         return np.random.choice(2,p = probs)
-    
+
     def _remember_step(self,state,action,reward):
         if self.prev  is None:
             self.prev = np.hstack((state,action))
@@ -84,8 +85,9 @@ class PG:
         else:
             self.t += 1
 
-        state = np.array(now)[1:]
+        state = np.array([now[0] - now[2] ,now[1] - now[3] ,now[3], now[4]])
         action = self._get_action(state)
+        
         if dead >= 0 :
             reward = 1
         else:
@@ -105,6 +107,7 @@ class PG:
 
             if self.episode % 10 == 0 :
                 self.saveNet()
+                self.plot()
         return action
 
     def train(self):
@@ -135,3 +138,17 @@ class PG:
             self.saver.save(self.sess, "Algorithm/PG/Net/model.ckpt")
             print("net has been saved successfully")
 
+    def plot(self):
+
+        xx,yy = np.meshgrid(np.arange(600),np.arange(280))
+        x = xx.flatten() - 228
+        y = yy.flatten() - 380
+        yd = np.ones_like(x) * 360
+        sp = np.ones_like(y) * 4.5
+        arr = np.vstack((x,y,yd,sp)).transpose(1,0)
+        re = self.sess.run(self.prob,feed_dict={self.state:arr})
+        img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
+        plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)
+
+# brain = PG(lr = 1e-3,state_dim = 4,do_train=True,do_load=False,do_save = True)
+# brain.plot()

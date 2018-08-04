@@ -20,7 +20,8 @@ class Q:
         self.prev = None
         self.gamma = 0.9
         self.lr = 0.7
-        self.episode = 0 
+        self.episode = 0
+        print('start Q-table algorithm')
 
     
     def run(self, now, dead, action):
