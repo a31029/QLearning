@@ -208,7 +208,7 @@ class ScoreBord():
 
 # 构建游戏
 class FlappyBird():
-    def __init__(self, is_speed_in_state = False,vec = True,graph = False,interval = 4):
+    def __init__(self, is_speed_in_state = False,vec = True,graph = False):
         pygame.init()
         pygame.freetype.init()
         pygame.display.set_caption(Parameters.sys_caption)
@@ -219,7 +219,6 @@ class FlappyBird():
         self.is_speed_in_state = is_speed_in_state
         self.vec = vec
         self.graph = graph
-        self.interval = interval
 
         # 先建管子 再建图 
         # 更新的时候 先更新图，在更新管子，如果管子重置，图也跟着重置
@@ -338,10 +337,8 @@ class FlappyBird():
         while(True):
             self._build()
             clock = pygame.time.Clock()
-            c_ter = 0
-            while True:
 
-                c_ter += 1
+            while True:
 
                 #设置时间
                 clock.tick(Parameters.sys_frame_rate)
@@ -380,10 +377,10 @@ class FlappyBird():
                         jump = 1
 
                 #判断是否修改动作
-                if func is not None and self.vec and (c_ter % self.interval == 0 or self.dead < 0):
+                if func is not None and self.vec:
                     jump = func(self.now, self.dead, jump)
 
-                if func is not None and not self.vec and (c_ter % self.interval == 0 or self.dead <0):
+                if func is not None and not self.vec :
                     jump = func(self.getImage(),self.dead,jump)
 
                 self._bird.jump(Parameters.bird_actions[jump])

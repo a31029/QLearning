@@ -32,7 +32,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 # if __name__ == "__main__":
-#     game = FlappyBird(interval = 1)
+#     game = FlappyBird()
 #     brain = Q(scale=7, explore=0)
 #     try:
 #         game.run(brain.run)
@@ -59,12 +59,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
 
-# Policy gradient 效果不太好，需要长时间的训练 并且训练并不稳定 通过不断的修改 lr 才能到现在的成都
-# 最多可以到 30  但是 基于 policy 的方法 始终没办法获得更好的效果 可能是我对 policy based的 还是存在一些理解的问题
+
+
+# Policy gradient 成功
+# 修改方法是:
+# 当speed 为负数时，即 小鸟正在向上冲刺，我们讲会对接下来几个state进行忽略，并不进行记录，当小鸟速度大于0时，即 开始下降时，我们会对后面的state 以及 action 进行记录。
+# 即要求 小鸟不能无限制的一直往上飞，而必须满足当速度开始下降时 才能继续飞。
+# 修改后的效果是 已经能够突破100了
+# 并且训练的时候会将过去的几个 track 进行 记录 然后 训练的时候 会sample 出来1个进行训练。
 
 
 # if __name__ == "__main__":
-#     game = FlappyBird(is_speed_in_state = True,graph=True,interval = 3)
+#     game = FlappyBird(is_speed_in_state = True,graph=True)
 #     brain = PG(lr = 1e-3,state_dim = 4,do_train=True,do_load=True,do_save = True)
 #     try:
 #         game.run(brain.run)
@@ -81,10 +87,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #  AC 或者 PG 算法 都有一个问题就是 训练比较慢 因为run一次 才能学一次 而 对于本游戏走到后面 run一次 可能要走10几步 比较慢
 
 if __name__ == "__main__":
-    game = FlappyBird(is_speed_in_state = True,graph=True,interval = 4)
-    brain = AC(l1 = 1e-3,l2 = 1e-3,state_dim=4,do_train=True,do_load=True,do_save=True)
-    try:
-        game.run(brain.run)
-    except:
-        brain.saveNet()
-
+    game = FlappyBird(is_speed_in_state = True,graph=True)
+    brain = AC(l1 = 1e-3,l2 = 1e-3,state_dim=4,do_train=True,do_load=False,do_save=True)
+    game.run(brain.run)

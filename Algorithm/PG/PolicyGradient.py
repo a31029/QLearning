@@ -38,7 +38,7 @@ class PG:
         self.memory_batch = []
 
     def _build_memory_pool(self):
-        self.memory_pool = deque([],maxlen=3)
+        self.memory_pool = deque([],maxlen=30)
 
     def _build_net(self):
         self.state = tf.placeholder(tf.float32,shape=[None,self.state_dim])
@@ -50,7 +50,7 @@ class PG:
         self.action = tf.placeholder(tf.int32,shape=[None])
         self.value = tf.placeholder(tf.float32,shape=[None])
 
-        self.loss = tf.reduce_mean(tf.reduce_sum( tf.log( self.prob) * tf.one_hot(self.action, 2), axis=1) * self.value * -1)
+        self.loss = tf.reduce_mean(tf.reduce_sum(tf.log(self.prob) * tf.one_hot(self.action, 2), axis=1) * self.value * -1)
 
         self.current_step = tf.Variable(0, trainable=False)
         self.learning_rate = tf.train.exponential_decay(self.lr,global_step = self.current_step,decay_steps=400,decay_rate=0.9,staircase=True)
@@ -66,7 +66,7 @@ class PG:
 
     def _get_action(self,state):
         probs = self.sess.run(self.prob, feed_dict={self.state: np.array([state])})[0]
-        # print(probs)
+        print(probs)
         return np.random.choice(2,p = probs)
 
     def _remember_step(self,state,action,reward):
@@ -87,38 +87,42 @@ class PG:
 
         state = np.array([now[0] - now[2] ,now[1] - now[3] ,now[3], now[4]])
         action = self._get_action(state)
-        
         if dead >= 0 :
             reward = 1
         else:
             reward = dead
 
-        self._remember_step(state, action, reward)
+        # 忽略 选择跳跃之后 的几个 state  
+        # 基于一个假设:小鸟不能 每秒 都往上飞
+        if state[-1] < 0 and dead >= 0:
+            return 0
+        else:
+            self._remember_step(state, action, reward)
 
-        if dead < 0:
-            self._remember()
-            print("Episode %s is completed. The total steps are %s" % (self.episode,self.t))
-            self.train()
-            self.memory_batch = []
-            self.prev = None
+            if dead < 0:
+                self._remember()
+                print("Episode %s is completed. The total steps are %s" % (self.episode,self.t))
+                self.train()
+                self.memory_batch = []
+                self.prev = None
 
-            self.episode += 1
-            self.t = None
+                self.episode += 1
+                self.t = None
 
-            if self.episode % 10 == 0 :
-                self.saveNet()
-                self.plot()
-        return action
+                if self.episode % 10 == 0 :
+                    self.saveNet()
+                    self.plot()
+            return action
 
     def train(self):
         if self.do_train:
-            for i in range(1):
+            for i in range(100):
                 m = np.array(self.memory_pool[np.random.choice(len(self.memory_pool))])
                 s = m[:,0:self.state_dim]
                 a = m[:, self.state_dim]
                 v = self._discount_and_norm_rewards(m[:, self.state_dim+1])
                 _, loss_value, lr, prob_value = self.sess.run([self.step, self.loss, self.learning_rate,self.prob], feed_dict={self.state: s, self.action: a, self.value: v})
-                print("lr:%s,    loss:%s."%(lr,loss_value))
+                # print("lr:%s,    loss:%s."%(lr,loss_value))
 
 
     def _discount_and_norm_rewards(self,v):
@@ -149,6 +153,3 @@ class PG:
         re = self.sess.run(self.prob,feed_dict={self.state:arr})
         img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
         plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)
-
-# brain = PG(lr = 1e-3,state_dim = 4,do_train=True,do_load=False,do_save = True)
-# brain.plot()

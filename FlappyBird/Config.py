@@ -6,7 +6,7 @@ from pathlib import Path
 class Parameters():
     sys_width = 288
     sys_height = 512
-    sys_frame_rate = 200
+    sys_frame_rate = 500
     sys_caption = "Flappy Bird"
 
 
