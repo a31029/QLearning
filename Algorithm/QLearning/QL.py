@@ -33,8 +33,11 @@ class Q:
             action = random.choice([0, 0, 0, 0, 0, 0, 0, 0, 1])
         else:
             action = np.argmax(actions)
-
-        reward = dead
+        
+        if dead >= 0:
+            reward = 1
+        else:
+            reward = dead
 
         if self.prev is None :
             self.prev = [state[0],state[1], action]

@@ -14,7 +14,6 @@ from Algorithm.PG.PolicyGradient import PG
 from Algorithm.AC.AC import AC
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0" 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 # random.seed(1)
 # tf.set_random_seed(1)
@@ -47,14 +46,14 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 # 训练6分钟 已经破100了
 
 
-if __name__ == "__main__":
-    game = FlappyBird(is_speed_in_state = True,graph=True)
-    brain = DQN(state_dim=4, explore=0.5, lr=1e-3, do_load = True, do_train=True,do_save=True)
-    try:
-        game.run(brain.run)
-    except:
-        brain.saveNet()
-        print('\nsave Net parameters in Net/checkpoint!!!')
+# if __name__ == "__main__":
+#     game = FlappyBird(is_speed_in_state = True,graph=False)
+#     brain = DQN(state_dim=4, explore=0.5, lr=1e-3, do_load = True, do_train=True,do_save=True)
+#     try:
+#         game.run(brain.run)
+#     except:
+#         brain.saveNet()
+#         print('\nsave Net parameters in Net/checkpoint!!!')
 
 
 
@@ -83,9 +82,10 @@ if __name__ == "__main__":
 # 当Q开始准了，actor 已经走到死胡同了 对 actor 的参数的导数为0了 训练不好了
 # 所以现在是 先 随机action 先学 q 之后再 根据Q 调整actor 现在能跑到94 左右了
 
-#  AC 或者 PG 算法 都有一个问题就是 训练比较慢 因为run一次 才能学一次 而 对于本游戏走到后面 run一次 可能要走10几步 比较慢
+#  AC  可能还有一点问题
+# 现在用的td_error 用的 还是 类似于policy gradient的 error  只不过 并不是直接用 r 而是用 (gamma * v_ + r - v) 但是感觉 和 policy gradient 差不多
 
-# if __name__ == "__main__":
-#     game = FlappyBird(is_speed_in_state = True,graph=False)
-#     brain = AC(l1 = 1e-3,l2 = 1e-3,state_dim=4,do_train=True,do_load=True,do_save=True)
-#     game.run(brain.run)
+if __name__ == "__main__":
+    game = FlappyBird(is_speed_in_state = True,graph=False)
+    brain = AC(l1 = 1e-3,l2 = 1e-3,state_dim=3,do_train=True,do_load=True,do_save=True)
+    game.run(brain.run)

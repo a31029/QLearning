@@ -39,10 +39,16 @@ class AC:
 
         self.s_eval = tf.placeholder(tf.float32, shape=[None, self.state_dim])
         self.s_target = tf.placeholder(tf.float32, shape=[None, self.state_dim])
+        self.s_actor = tf.placeholder(tf.float32, shape=[None, self.state_dim])
 
         self.a = tf.placeholder(tf.int32, shape=[None])
         self.r = tf.placeholder(tf.float32, shape=[None])
-        self.td_error = tf.placeholder(tf.float32, shape=[None])
+
+        self.new = tf.placeholder(tf.float32, shape=[None,2])
+        self.old = tf.placeholder(tf.float32, shape=[None,2])
+        self.a_ = tf.placeholder(tf.int32, shape=[None])
+
+        self.td_error = tf.placeholder(tf.float32,shape=[None])
 
         with tf.variable_scope('actor'):
             self.l1_w_actor = tf.get_variable('l1_w_actor',shape=[self.state_dim,32])
@@ -52,7 +58,7 @@ class AC:
             self.l3_w_actor = tf.get_variable('l3_w_actor',shape=[16,2])
             self.l3_b_actor = tf.get_variable('l3_b_actor',shape=[2,])
 
-            self.l1_actor = tf.nn.tanh(tf.matmul(self.s_eval,self.l1_w_actor) + self.l1_b_actor)
+            self.l1_actor = tf.nn.tanh(tf.matmul(self.s_actor,self.l1_w_actor) + self.l1_b_actor)
             self.l2_actor = tf.nn.tanh(tf.matmul(self.l1_actor,self.l2_w_actor)+self.l2_b_actor)
             self.output_actor = tf.nn.softmax(tf.matmul(self.l2_actor,self.l3_w_actor) + self.l3_b_actor)
 
@@ -93,17 +99,24 @@ class AC:
                      - ( self.gamma_value * tf.reduce_max(self.output_critic_target,axis = 1) * tf.cast(tf.greater(self.r , 0),tf.float32) + self.r)
                 )
             )
-            self.log_prob = self.output_actor
-            self.actor_loss = (tf.reduce_mean(tf.reduce_sum(tf.one_hot(self.a,2) * self.log_prob ,axis = 1) * self.td_error))
 
+            self.log_prob = self.output_actor
+            self.actor_loss = tf.reduce_mean(
+                tf.reduce_sum(self.log_prob * tf.one_hot(self.a,2),axis = 1)
+                * (
+                    self.td_error
+                )
+            )
+        
 
         with tf.variable_scope('train'):
             self.op_critic = tf.train.AdamOptimizer(self.learning_rate_critic)
             self.train_critic = self.op_critic.minimize(self.critic_loss)
 
-            self.op_actor = tf.train.AdamOptimizer(self.learning_rate_actor * -1)
-            self.train_actor = self.op_actor.minimize(self.actor_loss)
-
+            self.current_step = tf.Variable(0, trainable=False)
+            self.learning_rate = tf.train.exponential_decay(self.learning_rate_actor * (-1),global_step = self.current_step,decay_steps=10000,decay_rate=0.9,staircase=True)
+            self.train_actor = tf.train.AdamOptimizer(self.learning_rate).minimize(self.actor_loss,global_step=self.current_step)
+            
 
         self.saver = tf.train.Saver()
 
@@ -119,7 +132,7 @@ class AC:
         self.prev = None
         self.memory_batch = []
         self.memory = collections.deque(self.loadFile('Algorithm/AC/Memory/memory'), maxlen=2000)
-        self.memory_actor = collections.deque([],maxlen=50)
+        self.memory_actor = collections.deque([],maxlen=10)
 
 
     def _update(self):
@@ -132,12 +145,11 @@ class AC:
 
 
     def _get_action(self, s):
-        output_actor = self.sess.run(self.output_actor, feed_dict={self.s_eval: np.array([s])})
+        output_actor = self.sess.run(self.output_actor, feed_dict={self.s_actor: np.array([s])})
         if np.random.uniform() <= output_actor[0][0]:
             return 0
         else:
             return 1
-
 
     def _remember_step(self,state,action,reward):
         if self.prev  is None:
@@ -154,7 +166,7 @@ class AC:
 
     def run(self, now, dead, action):
 
-        state = np.array([now[0] - now[2] ,now[1] - now[3] ,now[3], now[4]])
+        state = np.array([now[0] - now[2] ,now[1] - now[3] , now[4]])
         action = self._get_action(state)
         if dead > self.max_value:
             self.max_value = dead
@@ -173,39 +185,39 @@ class AC:
 
                 if len(self.memory) > 100:
                     self.train_counter += 1
-                    if self.train_counter % 3  == 0:
+                    if self.train_counter <= 10:
                         self.ctrain()
-                    if self.train_counter > 6:
+                    if self.train_counter > 10:
                         self.atrain()
-                    if self.train_counter % 6 == 0:
+                    if self.train_counter % 20  == 0:
+                        self.ctrain()
+                    if self.train_counter % 50 == 0:
                         self._update()
                         self.saveFile('Algorithm/AC/Memory/memory', self.memory)
                         self.saveNet()
-                    if self.train_counter % 6 == 0:
                         print('小鸟训练了%s次，最大的数字为%s：'%(self.train_counter,self.max_value))
             return action
 
 
     def atrain(self):
         if self.do_train:
-            for i in range(50):
+            for i in range(20):
                 data = np.array(self.memory_actor[np.random.choice(len(self.memory_actor))])
                 # data = np.array(self.memory_actor[-1])
                 s = data[:,:self.state_dim]
                 a = data[:, self.state_dim]
-                r = data[:,self.state_dim + 1]    
                 s_ = data[:, self.state_dim+2:]
-                old = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval: s})
-                new = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval: s_})
-                a_new = self.sess.run(self.output_actor,feed_dict={self.s_eval:s_})
 
-                v_error = self._discount_and_norm_rewards(
-                    self.gamma_value * np.sum(new * a_new,axis = 1) + r - old[np.arange(a.shape[0]),a]
-                )
-                _,a_loss = self.sess.run([self.train_actor,self.actor_loss], feed_dict={self.a:a,self.s_eval:s,self.td_error: v_error})
-            
-            print('a_loss: %.2f'%(a_loss))
-            # print(v_error[-10:])
+                r = data[:,self.state_dim + 1]    
+
+                o = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval:s})
+                n = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval:s_})
+                a_ = self.sess.run(self.output_actor,feed_dict={self.s_actor:s_})
+
+                td_e = self._discount_and_norm_rewards(self.gamma_value * n[np.arange(a.shape[0]),np.argmax(a_,axis = 1)] + r - o[np.arange(a.shape[0]),a])
+
+                _,a_loss,lr = self.sess.run([self.train_actor,self.actor_loss,self.learning_rate], feed_dict={self.s_actor:s,self.a:a,self.td_error:td_e})
+            print('a_loss: %.2f and lr:%.8f'%(a_loss,lr))
         
     def ctrain(self):
         if self.do_train:
@@ -249,11 +261,15 @@ class AC:
         xx,yy = np.meshgrid(np.arange(600),np.arange(280))
         x = xx.flatten() - 228
         y = yy.flatten() - 380
-        yd = np.ones_like(x) * 360
         sp = np.ones_like(y) * 4.5
-        arr = np.vstack((x,y,yd,sp)).transpose(1,0)
+
+        # yd = np.ones_like(x) * 360
+        # arr = np.vstack((x,y,yd,sp)).transpose(1,0)
         # re = self.sess.run(self.output_actor,feed_dict={self.s_eval:arr})
+        
+        arr = np.vstack((x,y,sp)).transpose(1,0)
         re = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval:arr})
+        
         img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
         plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)
 
@@ -264,7 +280,7 @@ class AC:
         for t in reversed(range(0, discounted_ep_rs.shape[0])):
             running_add = running_add * self.gamma_value + v[t]
             discounted_ep_rs[t] = running_add
-            discounted_ep_rs[discounted_ep_rs > 10] = 10
+        discounted_ep_rs[discounted_ep_rs > 10] = 10
         # normalize episode rewards
         # discounted_ep_rs -= np.mean(discounted_ep_rs)
         # discounted_ep_rs /= np.std(discounted_ep_rs)

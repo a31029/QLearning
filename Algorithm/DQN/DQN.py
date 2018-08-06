@@ -188,6 +188,3 @@ class DQN():
         img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
         plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)
 
-
-# brain = DQN(state_dim=4, explore=0.5, lr=1e-3, do_load = True, do_train=True,do_save=True)
-# brain.plot()
