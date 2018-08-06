@@ -7,9 +7,6 @@ import random
 import pickle
 from pathlib import Path
 
-from PIL import Image
-
-
 
 class AC:
     def __init__(self,l1 = 1e-4,l2=1e-3,state_dim = 4,do_load = False,do_save = False,do_train = False):
@@ -24,7 +21,7 @@ class AC:
 
         self.gamma_value = 0.9
 
-        self.train_counter = 1
+        self.train_counter = 0
 
         self._get_session()
         self._build_net()
@@ -54,7 +51,6 @@ class AC:
             self.l2_b_actor = tf.get_variable('l2_b_actor',shape=[16,])
             self.l3_w_actor = tf.get_variable('l3_w_actor',shape=[16,2])
             self.l3_b_actor = tf.get_variable('l3_b_actor',shape=[2,])
-
 
             self.l1_actor = tf.nn.tanh(tf.matmul(self.s_eval,self.l1_w_actor) + self.l1_b_actor)
             self.l2_actor = tf.nn.tanh(tf.matmul(self.l1_actor,self.l2_w_actor)+self.l2_b_actor)
@@ -122,7 +118,7 @@ class AC:
     def _build_memory(self):
         self.prev = None
         self.memory_batch = []
-        self.memory = collections.deque(self.loadFile('Algorithm/AC/Memory/memory'), maxlen=1000)
+        self.memory = collections.deque(self.loadFile('Algorithm/AC/Memory/memory'), maxlen=2000)
         self.memory_actor = collections.deque([],maxlen=50)
 
 
@@ -160,6 +156,8 @@ class AC:
 
         state = np.array([now[0] - now[2] ,now[1] - now[3] ,now[3], now[4]])
         action = self._get_action(state)
+        if dead > self.max_value:
+            self.max_value = dead
         if dead >= 0 :
             reward = 1
         else:
@@ -174,24 +172,25 @@ class AC:
                 self._remember_batch()
 
                 if len(self.memory) > 100:
-                    if self.train_counter % 10  == 0:
+                    self.train_counter += 1
+                    if self.train_counter % 3  == 0:
                         self.ctrain()
-                    if self.train_counter > 10:
+                    if self.train_counter > 6:
                         self.atrain()
-                    if self.train_counter % 100 == 0:
+                    if self.train_counter % 6 == 0:
                         self._update()
                         self.saveFile('Algorithm/AC/Memory/memory', self.memory)
                         self.saveNet()
-                    self.train_counter += 1
-                    if self.train_counter % 100 == 0:
+                    if self.train_counter % 6 == 0:
                         print('小鸟训练了%s次，最大的数字为%s：'%(self.train_counter,self.max_value))
             return action
 
 
     def atrain(self):
         if self.do_train:
-            for i in range(100):
+            for i in range(50):
                 data = np.array(self.memory_actor[np.random.choice(len(self.memory_actor))])
+                # data = np.array(self.memory_actor[-1])
                 s = data[:,:self.state_dim]
                 a = data[:, self.state_dim]
                 r = data[:,self.state_dim + 1]    
@@ -206,7 +205,7 @@ class AC:
                 _,a_loss = self.sess.run([self.train_actor,self.actor_loss], feed_dict={self.a:a,self.s_eval:s,self.td_error: v_error})
             
             print('a_loss: %.2f'%(a_loss))
-            print(v_error[-10:])
+            # print(v_error[-10:])
         
     def ctrain(self):
         if self.do_train:
@@ -221,7 +220,7 @@ class AC:
 
                 _,c_loss = self.sess.run([self.train_critic,self.critic_loss], feed_dict={self.s_eval: s, self.s_target: s_, self.r: r,self.a:a})
             print('c_loss:%.2f'%(c_loss))
-            # self.plot()
+            self.plot()
 
 
     def saveNet(self):
@@ -265,6 +264,7 @@ class AC:
         for t in reversed(range(0, discounted_ep_rs.shape[0])):
             running_add = running_add * self.gamma_value + v[t]
             discounted_ep_rs[t] = running_add
+            discounted_ep_rs[discounted_ep_rs > 10] = 10
         # normalize episode rewards
         # discounted_ep_rs -= np.mean(discounted_ep_rs)
         # discounted_ep_rs /= np.std(discounted_ep_rs)

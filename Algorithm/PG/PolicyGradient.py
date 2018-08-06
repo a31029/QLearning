@@ -66,7 +66,6 @@ class PG:
 
     def _get_action(self,state):
         probs = self.sess.run(self.prob, feed_dict={self.state: np.array([state])})[0]
-        print(probs)
         return np.random.choice(2,p = probs)
 
     def _remember_step(self,state,action,reward):
@@ -122,7 +121,7 @@ class PG:
                 a = m[:, self.state_dim]
                 v = self._discount_and_norm_rewards(m[:, self.state_dim+1])
                 _, loss_value, lr, prob_value = self.sess.run([self.step, self.loss, self.learning_rate,self.prob], feed_dict={self.state: s, self.action: a, self.value: v})
-                # print("lr:%s,    loss:%s."%(lr,loss_value))
+            print("lr:%s,    loss:%s."%(lr,loss_value))
 
 
     def _discount_and_norm_rewards(self,v):
@@ -131,6 +130,7 @@ class PG:
         for t in reversed(range(0, discounted_ep_rs.shape[0])):
             running_add = running_add * self.gamma_value + v[t]
             discounted_ep_rs[t] = running_add
+        discounted_ep_rs[discounted_ep_rs > 10] = 10
         # normalize episode rewards
         # discounted_ep_rs -= np.mean(discounted_ep_rs)
         # discounted_ep_rs /= np.std(discounted_ep_rs)
