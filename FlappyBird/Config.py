@@ -34,12 +34,9 @@ class Parameters():
     pipe_num = 3
     pipe_width = 52
     pipe_height = 320
-    pipe1_location = sys_width
-    pipe2_location = sys_width + pipe_x_interval
-    pipe3_location = sys_width + 2 * pipe_x_interval
+    pipe_location = [sys_width,sys_width + pipe_x_interval, sys_width + 2 * pipe_x_interval] 
 
-    ground1_location = np.array([0, 400])
-    ground2_location = np.array([336, 400])
+    ground_location = [np.array([0, 400]), np.array([336, 400])]
     ground_num = 2
 
     font_size = 50

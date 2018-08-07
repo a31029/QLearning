@@ -31,8 +31,8 @@ os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
 
 
 # if __name__ == "__main__":
-#     game = FlappyBird()
-#     brain = Q(scale=7, explore=0)
+#     game = FlappyBird(graph=True)
+#     brain = Q(scale=4, explore=0)
 #     try:
 #         game.run(brain.run)
 #     except:
@@ -49,11 +49,12 @@ os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
 # if __name__ == "__main__":
 #     game = FlappyBird(is_speed_in_state = True,graph=False)
 #     brain = DQN(state_dim=4, explore=0.5, lr=1e-3, do_load = True, do_train=True,do_save=True)
-#     try:
-#         game.run(brain.run)
-#     except:
-#         brain.saveNet()
-#         print('\nsave Net parameters in Net/checkpoint!!!')
+#     game.run(brain.run)
+#     # try:
+#     #     game.run(brain.run)
+#     # except:
+#     #     brain.saveNet()
+#     #     print('\nsave Net parameters in Net/checkpoint!!!')
 
 
 
@@ -66,6 +67,7 @@ os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"
 # 即要求 小鸟不能无限制的一直往上飞，而必须满足当速度开始下降时 才能继续飞。
 # 修改后的效果是 已经能够突破100了
 # 并且训练的时候会将过去的几个 track 进行 记录 然后 训练的时候 会sample 出来1个进行训练。
+
 
 # if __name__ == "__main__":
 #     game = FlappyBird(is_speed_in_state = True,graph=False)

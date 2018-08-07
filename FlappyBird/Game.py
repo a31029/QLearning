@@ -17,6 +17,7 @@ from FlappyBird.Config import File_Path
 # 5.移动 根据移动速度进行移动
 # 6.验证 (验证小鸟是否出框 验证groud 验证oipe 是否出框 如果出框 就需要要重置)
 # 7.更新 
+
 class mySprite(pygame.sprite.Sprite):
     def __init__(self, filename, row_col_nums, location, frame_speed, moving_speed, moving_acc):
         pygame.sprite.Sprite.__init__(self)
@@ -76,8 +77,16 @@ class mySprite(pygame.sprite.Sprite):
 
 # 继承mysprite，构建小鸟 
 # 重写validate 函数(验证是否到达上框) 并添加一个 jump函数(其实就是设置moving_speed)
+
+
 class Bird(mySprite):
-    def __init__(self, filename, row_col_nums, location, frame_speed, moving_speed, moving_acc):
+    def __init__(self,filename = np.random.choice(File_Path.bird),
+                row_col_nums = Parameters.bird_row_col,
+                location = Parameters.bird_location,
+                frame_speed = Parameters.bird_frame_speed,
+                moving_speed = Parameters.bird_moving_speed,
+                moving_acc = Parameters.bird_moving_acc):
+
         mySprite.__init__(self, filename, row_col_nums, location, frame_speed, moving_speed, moving_acc)
         # self.secondJump = True
 
@@ -91,23 +100,53 @@ class Bird(mySprite):
         if moving_speed is not None:
             self.setMoving_speed(moving_speed)
 
+
+
 # 继承mysprite，构建地面
 # 重写validate 函数(验证是否出左边框) 
 class Ground(mySprite):
-    def __init__(self, filename, row_col_nums, location, frame_speed, moving_speed, moving_acc,num):
-        mySprite.__init__(self, filename, row_col_nums, location, frame_speed, moving_speed, moving_acc)
-        self.num = num
+
+    def __init__(self, index,filename = File_Path.ground,
+                row_col_nums = Parameters.ground_row_col,
+                location = Parameters.ground_location,
+                frame_speed = Parameters.ground_frame_speed,
+                moving_speed = Parameters.ground_moving_speed,
+                moving_acc= Parameters.ground_moving_acc,
+                total = Parameters.ground_num):
+
+        self.index = index
+        self.total = total
+        mySprite.__init__(self, filename, row_col_nums, location[self.index], frame_speed, moving_speed, moving_acc)
 
     def validate(self):
         if self.rect.x + self.rect.width < 0:
-            self.rect[0] += self.num * self.rect.width
+            self.rect[0] += self.total * self.rect.width
 
-# 构建一个graph类，把Q值的图片加载在游戏背景上 方便debug
+
+
 # 加载Q值的图 
 class Graph(mySprite):
-    def __init__(self, filename, row_col_nums, location, frame_speed, moving_speed, moving_acc,container):
-        mySprite.__init__(self, filename, row_col_nums, location,frame_speed, moving_speed, moving_acc)
+    def __init__(self,father,container,filename,
+                row_col_nums = Parameters.ground_row_col,
+                frame_speed = Parameters.ground_frame_speed,
+                moving_speed = Parameters.ground_moving_speed,
+                moving_acc = Parameters.ground_moving_acc):
+
+        self.father = father
         self.container = container
+        location = (self.father.rect.x,self.father.rect.y)
+        mySprite.__init__(self, filename, row_col_nums, location,frame_speed, moving_speed, moving_acc)
+
+    def move(self):
+        pass
+
+    def validate(self):
+        if self.rect.x - Parameters.state_x_min - Parameters.bird_width/2 < self.father.rect.x:
+            self.container.move_to_back(self)
+        self.rect.x = self.father.rect.x + Parameters.state_x_min + Parameters.bird_width/2
+        self.rect.y = self.father.rect.y + Parameters.state_y_min + Parameters.bird_height
+
+
 
 # 继承mysprite 构建pipe类
 class Pipe(mySprite):
@@ -121,66 +160,61 @@ class Pipe(mySprite):
     bird_height = Parameters.bird_height
     bird_width = Parameters.bird_width
 
-    @classmethod
-    def resetY(cls):
-        cls.yd = int(np.random.uniform(
-            cls.pipe_y_range[0] + cls.pipe_head+cls.pipe_y_interval, cls.pipe_y_range[1]-cls.pipe_head))
-        cls.yu = cls.yd - cls.pipe_y_interval - cls.pipe_height
-        cls.counter = True
+    loc = {}
+    flg = {}
 
     @classmethod
-    def counts(cls):
-        cls.counter = cls.counter ^ True
-        if cls.counter is True:
-            cls.resetY()
+    def build(cls,total_num):
+        for i in range(total_num):
+            cls.loc[i] = {}
+            cls.loc[i]['d'] ,cls.loc[i]['u'] = cls.randY()
+            cls.flg[i] = True
 
-    def __init__(self, filename, row_col_nums, x_location, frame_speed, moving_speed, moving_acc, up_down,num, graph_file=None,graph_row_col=None,graph_container = None):
-        self.num = num
+    @classmethod
+    def refresh(cls,n):
+        if cls.flg[n]:
+            cls.loc[n]['d'], cls.loc[n]['u'] = cls.randY()
+        cls.flg[n] = cls.flg[n] ^ True
+
+    @classmethod
+    def randY(cls):
+        d = int(np.random.uniform(cls.pipe_y_range[0] + cls.pipe_head+cls.pipe_y_interval, cls.pipe_y_range[1]-cls.pipe_head))
+        # d = np.random.choice([cls.pipe_y_range[0] + cls.pipe_head+cls.pipe_y_interval, cls.pipe_y_range[1]-cls.pipe_head - 10])
+        u = d - cls.pipe_y_interval - cls.pipe_height
+        return d,u
+
+    def __init__(self,index,up_down,
+                filename = File_Path.pipe[0],
+                row_col_nums = Parameters.ground_row_col,
+                x_location = Parameters.pipe_location,
+                frame_speed = Parameters.ground_frame_speed,
+                moving_speed = Parameters.ground_moving_speed,
+                moving_acc = Parameters.ground_moving_acc,
+                total = Parameters.pipe_num):
+            
+        self.index = index
         self.up_down = up_down
+        self.total = total
 
-        location = (x_location,self.yu if up_down else self.yd)
-        mySprite.__init__(self, filename, row_col_nums, location,
-                                  frame_speed, moving_speed, moving_acc)
-        self.counts()
-        #如果管子是down 则会同时创建一个图
-        if self.up_down is True:
+        location = (x_location[self.index],self.loc[self.index][self.up_down])
+        mySprite.__init__(self, filename, row_col_nums, location,frame_speed, moving_speed, moving_acc)
+        
+        if self.up_down == 'u':
             self.roll()
-            self.graph = None
-        else:
-            if graph_file is None or graph_container is None :
-                # print("alert:需要一个Q值图和图的容器!!!!!")
-                self.graph = None
-                self.container = None
-            else:
-                # 最原始的Q值矩阵中 上下限 分别为-228,52, -360,400-40-self._pipe_y_interval
-                # 0,0 点 表示 鸟的左上角 和 管子左上角 重叠
-                # 经过平移  图的左上角 为  管子左上角.x +228 管子左上角.y + 360
-                # 为了图好看 又把 图往右下角移动了半个鸟的身位置
-                graph_location = (self.rect[0] + self.state_x_min + self.bird_width/2,
-                                  self.rect[1] + self.state_y_min + self.bird_height)
-                self.graph = Graph(graph_file, graph_row_col, graph_location,
-                                   self.frame_speed, self.moving_speed, self.moving_acc, graph_container)
-
-    # 每次管子重置位置的时候，会连同图的位置一起重置
-    # 同时重置的时候，会把图的位置移动到图层的最后一层
-    def _resetGraph(self):
-        graph_location = (self.rect[0] + self.state_x_min + self.bird_width/2,
-                          self.rect[1] + self.state_y_min + self.bird_height)
-        self.graph.rect[0] = graph_location[0]
-        self.graph.rect[1] = graph_location[1]
-        self.graph.container.move_to_back(self.graph)
 
     def validate(self):
         if self.rect.x + self.rect.width + Parameters.graph_factor < 0:
-            self.rect[0] += self.pipe_x_interval * self.num
-            self.rect[1] = self.yu if self.up_down else self.yd
-            self.counts()
-            if self.graph is not None:
-                self._resetGraph()
+            self.refresh(self.index)
+            self.rect[0] += self.pipe_x_interval * self.total
+            self.rect[1] = self.loc[self.index][self.up_down]
+
 
 # 构建一个 积分牌 类
 class ScoreBord():
-    def __init__(self,font_path,font_size,font_location):
+    def __init__(self,
+                font_path = File_Path.font,
+                font_size = Parameters.font_size,
+                font_location = Parameters.font_location):
         self.score = 0
         self.font = pygame.freetype.Font(font_path)
         self.font_size = font_size
@@ -224,57 +258,34 @@ class FlappyBird():
         # 更新的时候 先更新图，在更新管子，如果管子重置，图也跟着重置
 
     def _build(self):
+
+        self._graphs_files = [str(p) for p in Path('FlappyBird/graph').iterdir() if p.match('*.png')]
+
         self._screen = pygame.display.set_mode((Parameters.sys_width, Parameters.sys_height))
         self._bg = pygame.image.load(np.random.choice(File_Path.bg))
 
-        self._groud_group = pygame.sprite.LayeredUpdates()
-        if self.graph:
-            self._graph_group = pygame.sprite.LayeredUpdates()
+        self._ground_group = pygame.sprite.LayeredUpdates()
+        self._grounds = [Ground(i) for i in range(Parameters.ground_num)]
+        Pipe.build(Parameters.pipe_num)
+        self._pipes = [Pipe(i,j) for i in range(Parameters.pipe_num) for j in ['u','d']]
+        
         self._flappy = pygame.sprite.Group()
-
-        self._ground1 = Ground(File_Path.ground, Parameters.ground_row_col, Parameters.ground1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,Parameters.ground_num)
-        self._ground2 = Ground(File_Path.ground, Parameters.ground_row_col, Parameters.ground2_location,Parameters.ground_frame_speed, Parameters.ground_moving_speed, Parameters.ground_moving_acc, Parameters.ground_num)
-
-        self._graphs = [str(p) for p in Path('FlappyBird/graph').iterdir() if p.match('*.png')]
-
-        pipeFile = np.random.choice(File_Path.pipe)
-        Pipe.resetY()
-        self._pipe1u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
-        if self.graph:
-            self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[0],Parameters.ground_row_col,self._graph_group)
-        else:
-            self._pipe1d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe1_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
-        self._pipe2u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
-        if self.graph:
-            self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[0],Parameters.ground_row_col,self._graph_group)
-        else:
-            self._pipe2d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe2_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
-        self._pipe3u = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,True,Parameters.pipe_num)
-        if self.graph:
-            self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num,self._graphs[0],Parameters.ground_row_col,self._graph_group)
-        else:
-            self._pipe3d = Pipe(pipeFile,Parameters.ground_row_col,Parameters.pipe3_location,Parameters.ground_frame_speed,Parameters.ground_moving_speed,Parameters.ground_moving_acc,False,Parameters.pipe_num)
-        
-        self._groud_group.add(self._ground1, layer=1)
-        self._groud_group.add(self._ground2, layer=1)
-        self._groud_group.add(self._pipe1u,layer=0)
-        self._groud_group.add(self._pipe1d,layer=0)
-        self._groud_group.add(self._pipe2u,layer=0)
-        self._groud_group.add(self._pipe2d,layer=0)
-        self._groud_group.add(self._pipe3u,layer=0)
-        self._groud_group.add(self._pipe3d,layer=0)
-        
-        if self.graph:
-            self._graph_group.add(self._pipe1d.graph,layer = 3)
-            self._graph_group.add(self._pipe2d.graph,layer = 2)
-            self._graph_group.add(self._pipe3d.graph,layer = 1)
-
-        self._bird = Bird(np.random.choice(File_Path.bird), Parameters.bird_row_col,Parameters.bird_location,
-                          Parameters.bird_frame_speed, Parameters.bird_moving_speed, Parameters.bird_moving_acc)
-        self._flappy.add(self._bird)
+        self._bird = Bird()
 
         self._score_bord = ScoreBord(File_Path.font, Parameters.font_size, Parameters.font_location)
+
+        for obj in self._grounds:
+            self._ground_group.add(obj,layer = 1) 
+        for obj in self._pipes:
+            self._ground_group.add(obj,layer = 0)
+        self._flappy.add(self._bird)
         
+        if self.graph:
+            self._graph_group = pygame.sprite.LayeredUpdates()
+            self._graphs = [Graph(obj,self._graph_group,self._graphs_files[0]) for obj in self._pipes if obj.up_down == 'd']
+            for i,obj in enumerate(self._graphs):
+                self._graph_group.add(obj,layer = Parameters.pipe_num - i)
+
         if self.is_speed_in_state:
             self.now = (0,0,0,0,0)
         else:
@@ -301,8 +312,8 @@ class FlappyBird():
 
     def _updateState(self):
         #计算状态
-        locations = np.array([[self._pipe1d.rect[0], self._pipe1d.rect[1]],[self._pipe2d.rect[0], self._pipe2d.rect[1]],[self._pipe3d.rect[0], self._pipe3d.rect[1]]])
-        ind = locations[:, 0] > self._bird.rect.x - self._pipe1d.rect.width
+        locations = np.array([[obj.rect.x,obj.rect.y] for obj in self._pipes if obj.up_down == 'd'])
+        ind = locations[:, 0] > self._bird.rect.x - Parameters.pipe_width
         pip_x, pip_y = (locations[ind][np.argmin(locations[ind],axis = 0)[0],:])
 
         if self.is_speed_in_state:
@@ -322,7 +333,7 @@ class FlappyBird():
         self.dead = self._score_bord.score
 
         #碰撞检测
-        if pygame.sprite.spritecollideany(self._bird, self._groud_group) or self._bird.rect.y <= 0:
+        if pygame.sprite.spritecollideany(self._bird, self._ground_group) or self._bird.rect.y <= 0:
             self._playSound(File_Path.hit)
             self.dead = -10
 
@@ -332,12 +343,12 @@ class FlappyBird():
     def get_screen(self):
         return self._screen
 
+
     def run(self, func=None):
 
         while(True):
             self._build()
             clock = pygame.time.Clock()
-
             while True:
 
                 #设置时间
@@ -347,18 +358,17 @@ class FlappyBird():
                 self._playBGM()
                 
                 # 刷新图像
-                # 先更新图，再更新管子
-                # 画的时候，先画图 在画管子和小鸟
-                if self.graph:
-                    self._graph_group.update()
                 self._flappy.update()
-                self._groud_group.update()
+                self._ground_group.update()
                 self._score_bord.update()
+
                 self._screen.blit(self._bg, (0, 0))
                 if self.graph:
+                    self._graph_group.update()
                     self._graph_group.draw(self._screen)
+
                 self._flappy.draw(self._screen)
-                self._groud_group.draw(self._screen)
+                self._ground_group.draw(self._screen)
                 self._score_bord.draw(self._screen)
                 pygame.display.update()
 
@@ -369,12 +379,14 @@ class FlappyBird():
 
                 # 获取跳跃动作
                 for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        pygame.quit()
-                    if event.type == pygame.K_SPACE:
+                    if event.type == 2 and event.dict['key'] == 32:
                         jump = 1
+                        break
+                    if event.type == 2 and event.dict['key'] == 27:
+                        pygame.quit()
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         jump = 1
+                        break
 
                 #判断是否修改动作
                 if func is not None and self.vec:

@@ -110,10 +110,11 @@ class AC:
         
 
         with tf.variable_scope('train'):
+            self.current_step = tf.Variable(0, trainable=False)
+
             self.op_critic = tf.train.AdamOptimizer(self.learning_rate_critic)
             self.train_critic = self.op_critic.minimize(self.critic_loss)
 
-            self.current_step = tf.Variable(0, trainable=False)
             self.learning_rate = tf.train.exponential_decay(self.learning_rate_actor * (-1),global_step = self.current_step,decay_steps=10000,decay_rate=0.9,staircase=True)
             self.train_actor = tf.train.AdamOptimizer(self.learning_rate).minimize(self.actor_loss,global_step=self.current_step)
             
@@ -258,20 +259,18 @@ class AC:
 
     def plot(self):
 
-        xx,yy = np.meshgrid(np.arange(600),np.arange(280))
-        x = xx.flatten() - 228
-        y = yy.flatten() - 380
+        yy,xx = np.meshgrid(np.arange(280),np.arange(600))
+        x = xx.flatten() - 380
+        y = yy.flatten() - 228
         sp = np.ones_like(y) * 4.5
-
-        # yd = np.ones_like(x) * 360
-        # arr = np.vstack((x,y,yd,sp)).transpose(1,0)
-        # re = self.sess.run(self.output_actor,feed_dict={self.s_eval:arr})
-        
         arr = np.vstack((x,y,sp)).transpose(1,0)
         re = self.sess.run(self.output_critic_eval,feed_dict={self.s_eval:arr})
-        
-        img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
-        plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)
+        array = re[:,0]-re[:,1]
+        array[array > 0] = 1
+        array[array<0] = -1
+        array = array.reshape(600,280)
+        plt.imsave('FlappyBird/graph/z.png',array,cmap=plt.cm.gray)
+
 
 
     def _discount_and_norm_rewards(self,v):

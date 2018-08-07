@@ -19,13 +19,15 @@ class Q:
         self.explore = explore
         self.prev = None
         self.gamma = 0.9
-        self.lr = 0.7
+        self.lr = 0.8
         self.episode = 0
         print('start Q-table algorithm')
 
     
     def run(self, now, dead, action):
-
+        self.episode += 1
+        if self.episode % 8000 == 0:
+            self.save()
         state = self.index.trans2d(now)
         actions = self.Q[state[0],state[1]]
         

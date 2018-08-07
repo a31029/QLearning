@@ -144,12 +144,20 @@ class PG:
 
     def plot(self):
 
-        xx,yy = np.meshgrid(np.arange(600),np.arange(280))
-        x = xx.flatten() - 228
-        y = yy.flatten() - 380
-        yd = np.ones_like(x) * 360
+
+        yy,xx = np.meshgrid(np.arange(280),np.arange(600))
+        x = xx.flatten() - 380
+        y = yy.flatten() - 228
+        z = np.ones_like(x) * 120
         sp = np.ones_like(y) * 4.5
-        arr = np.vstack((x,y,yd,sp)).transpose(1,0)
+        arr = np.vstack((x,y,z,sp)).transpose(1,0)
         re = self.sess.run(self.prob,feed_dict={self.state:arr})
-        img = ((re[:,0]-re[:,1])>0).astype(np.int).reshape(280,600).transpose(1,0)
-        plt.imsave('FlappyBird/graph/z.png',img,cmap=plt.cm.gray)
+        array = re[:,0]-re[:,1]
+        array[array > 0] = 1
+        array[array < 0] = -1
+        array = array.reshape(600,280)
+        plt.imsave('FlappyBird/graph/z.png',array,cmap=plt.cm.gray)
+
+
+# brain = PG(lr = 1e-3,state_dim = 4,do_train=True,do_load=True,do_save = True)
+# brain.plot()
