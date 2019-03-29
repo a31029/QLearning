@@ -7,4 +7,4 @@ FlappyBird module is the Flappy bird implements in Python algorithm with pygame.
 
 Algorithm module contains four major RL algorihtms. QLearning DQN PolicyGradient Actor-critic
 
-neural networks are pre-trained pretty trained. But 
+neural networks are pre-trained. But the performance of PG and AC  are not pretty well. 
