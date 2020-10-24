@@ -1,10 +1,8 @@
-# QLearning
-Reinforcement learning for Flappybird
+# Playing Flappy bird with Reinforcement Learning
 
-FlappyBird module is the Flappy bird implements in Python algorithm with pygame.
-  The pics are copy from SarvagyaVaish which is a flappybird in javascript. https://github.com/SarvagyaVaish/FlappyBirdRL
+>
++ FlappyBird module: The simulator of Flappy bird in python and pygame.  
+*The pics are copied from [FlappyBirdRL](https://github.com/SarvagyaVaish/FlappyBirdRL) which is a javascript simulator.*   
   
-
-Algorithm module contains four major RL algorihtms. QLearning DQN PolicyGradient Actor-critic
-
-neural networks are pre-trained. But the performance of PG and AC  are not pretty well. 
++ Algorithm module: QLearning, DQN, PolicyGradient, Actor-critic.
+*The neural networks are pre-trained. However, the performance of PG and AC is not pretty well.*  
